@@ -170,7 +170,7 @@ class Database
 			{
 			datum content = ::gdbm_fetch(db(), key);
 			if(content.dptr==NULL) return std::auto_ptr<V>(NULL);
-			std::auto_ptr<V> v= dataBinding->entryToObject(&content);
+			std::auto_ptr<V> v= getDataBinding()->entryToObject(&content);
 			std::free(content.dptr);
 			return v;
 			}
