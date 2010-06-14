@@ -6,14 +6,14 @@
 %}
 
 %union	{
-	double _double;
+	Node::json_floating_type _double;
 	char _bool;
-	long _long;	
-	struct { char* s;int length;} literal;
-	JSONNodePtr node;
-	JSONNodePtr array;
-	JSONNodePtr object;
-	JSONObjetEntryPtr entry;
+	Node::json_integer_type _long;
+	std::string* literal;
+	NodePtr node;
+	ArrayNode* array;
+	ObjectNode* object;
+	std::pair<std::string*,NodePtr>* entry;
 	} 	
 
 %pure-parser
@@ -21,8 +21,7 @@
 %locations
 %defines
 %error-verbose
-%parse-param{BisonContextPtr context}
-%lex-param{void* my_yyscanner}
+%parse-param{lindenb:json::Parser context}
 
 %token COMMA DOTDOT ARRAY_OPEN ARRAY_CLOSE OBJECT_OPEN OBJECT_CLOSE  NIL
 %token<literal> LITERAL
@@ -64,11 +63,6 @@ void yyerror(YYLTYPE* locp,BisonContextPtr context,const char* message)
 
 input: any
 	{
-	if(context->error_flag!=0)
-		{
-		JSONNodeFree($1);
-		$1=NULL;
-		}
 	context->node=$1;
 	};
 
@@ -84,126 +78,66 @@ any:      array { $$=$1;}
         ;
 
 array: ARRAY_OPEN array_items ARRAY_CLOSE
-	{
-	$$=$2;
-	}
+		{
+		$$=$2;
+		}
 	| ARRAY_OPEN  ARRAY_CLOSE
-	{
-	$$=JSONNodeArrayNew();
-	}
-	| ARRAY_OPEN error ARRAY_CLOSE
-	{
-	$$=NULL;
-	}
+		{
+		$$= new ArrayNode;
+		}
 	;
 
 array_items: any
 		{
-		$$=JSONNodeArrayNew();
-		if(JSONNodeArrayAppend($$,$1)!=1)
-			{
-			JSONNodeFree($$);
-			JSONNodeFree($1);
-			$$=NULL;
-			}
-			
+		$$=new ArrayNode;
+		$$->vector().push_back($1);
 		}
 	   | array_items COMMA any 
 	   	{
 	   	$$=$1;
-	   	if(JSONNodeArrayAppend($$,$3)!=1)
-			{
-			JSONNodeFree($$);
-			JSONNodeFree($3);
-			$$=NULL;
-			}
+	   	$$->vector().push_back($3);
 	   	};
 
 object: OBJECT_OPEN object_items OBJECT_CLOSE
 	{ $$=$2;}
 	| OBJECT_OPEN OBJECT_CLOSE
-	{ $$=JSONNodeObjectNew();}
+	{ $$=new ObjectNode();}
 	;
 
 object_items: object_item
 		{
-		$$= JSONNodeObjectNew();
-		if(JSONNodeObjectPut($$,$1)!=1)
-			{
-			JSONNodeFree($$);
-			JSONObjetEntryFree($1);
-			$$=NULL;
-			}
+		$$= new ObjectNode;
+		$$->map().insert(std::pair<std::string,NodePtr>(
+			*($1->first),
+			$1->second
+			);
+		delete $1->first;
 		}
 	   | object_items COMMA object_item
 		{
 		$$=$1;
-		if(JSONNodeObjectPut($1,$3)!=1)
-			{
-			JSONNodeFree($1);
-			JSONObjetEntryFree($3);
-			$$=NULL;
-			}
-		
+		$$->map().insert(std::pair<std::string,NodePtr>(
+			*($3->first),
+			$3->second
+			);
+		delete $3->first;
 		}
-	    | object_items COMMA error
-	    	{
-	    	JSONNodeFree($1);
-	    	$$=NULL;
-	    	}
 	   ;
 
 object_item: literal DOTDOT any
 	{
-	$$ = JSONObjetEntryNew($1,$3);
-	if($$==NULL)
-		{
-		JSONNodeFree($1);
-		JSONNodeFree($3);
-		}
-	
+	$$ = new std::pair<std::string*,NodePtr>($1,$3);
 	};
 
-literal: LITERAL 	{
-	$$=JSONNodeNewNString($1.s,$1.length);
-	if($1.s!=NULL)
-		{
-		free($1.s);
-		}
+literal: LITERAL
+	{
+	$$=new StringNode(*$1);
+	delete $1;
 	} ;
-floating: FLOATING 	{ $$=JSONNodeNewFloating($1);} ;
-integer: INTEGER	{ $$=JSONNodeNewInteger($1);} ;
-nil: NIL		{ $$=JSONNodeNewNull();} ;
-boolean: BOOLEAN 	{ $$=JSONNodeNewBoolean($1);};
+floating: FLOATING 	{ $$= new FloatingNode($1);} ;
+integer: INTEGER	{ $$= new IntegerNode($1);} ;
+nil: NIL		{ $$= new NullNode();} ;
+boolean: BOOLEAN 	{ $$= new BooleanNode($1);};
 
 
 %%
-//extern int json_lex(YYSTYPE* lvalp,void* scanner);
-
-#ifdef TEST_THIS_CODE
-
-int main(int argc,char** argv)
-	{
-	long i;
-	for( i=0;i<10L;++i)
-		{
-		JSONNodePtr ptr=jsonParse("{'PI':3.14,'a':[null,true,false,2.0,{},[]]}");
-		DataStream ds= JSONSerialize(ptr);
-		if(ds==NULL)
-			{
-			printf("ds is null\n");
-			}
-		else
-			{
-			JSONNodePtr ptr2= JSONDeserialize(ds);
-			JSONPrint(stderr,ptr2);
-			JSONNodeFree(ptr2);
-			
-			}
-		DataStreamFree(ds);
-		JSONNodeFree(ptr);
-		}
-	return 0;
-	
-	}
-#endif

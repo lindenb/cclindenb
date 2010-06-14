@@ -1,6 +1,7 @@
 #ifndef _LINDENB_JSON_H
 #define _LINDENB_JSON_H
 #include <iostream>
+#include <cstdio>
 #include <string>
 #include <map>
 #include <vector>
@@ -19,6 +20,8 @@ namespace json
 		array,
 		object
 		};
+	
+
 	
 	typedef class Node
 		{
@@ -268,6 +271,14 @@ namespace json
 				}
 		};
 	
+		class	Parser: public Lexer
+			{
+			private:
+				
+			public:
+				Parser(std::istream& in):Lexer(in) {}
+				NodePtr parse();
+			};
 	
 	}
 	}	

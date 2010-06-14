@@ -42,10 +42,7 @@
 
 
 #define YY_EXTRA_TYPE BisonContextPtr
-	
 
-//forward declaration
-void transferBufferToYYSVAL(yyscan_t yyscanner);
 
 
 #define FLEX_BUFFER_APPEND(c) {\
@@ -118,74 +115,35 @@ null { return NIL;}
 .	{return yyget_text(yyscanner)[0]; }
 %%
 
-void transferBufferToYYSVAL(yyscan_t yyscanner)
+
+
+extern int json_parse(Parser* ctx);
+
+
+static NodePtr _parse(Parser* ctx)
 	{
-	char* copy=NULL;
-	DataStream ptr=(DataStream)(yyget_extra(yyscanner)->flexbuff);
-	if(ptr!=NULL)
-		{
-		copy= malloc(DataStreamSize(ptr)+1);
-		if(copy!=NULL)
-			{
-			memcpy(copy,ptr->data,sizeof(char)*DataStreamSize(ptr));
-			ptr->data[DataStreamSize(ptr)]=0;
-			yyget_lval(yyscanner)->literal.s= copy;
-			yyget_lval(yyscanner)->literal.length= DataStreamSize(ptr);
-			}
-		}
-	if(copy==NULL)
-		{
-		yyget_extra(yyscanner)->error_flag=1;
-		yyget_lval(yyscanner)->literal.s=NULL;
-		yyget_lval(yyscanner)->literal.length=-1;
-		}
-	DataStreamFree(ptr);
-	yyget_extra(yyscanner)->flexbuff=NULL;
+	return NULL;
 	}
 
-extern int json_parse(BisonContextPtr context);
-
-
-static JSONNodePtr _parse(BisonContextPtr ctx)
+NodePtr Parser::parse(const char* s,size_t length)
 	{
-	//YYSTYPE test;
-	
-	yyscan_t scanner;
-	
-	if(json_lex_init_extra(ctx,&scanner)!=0)
-		{
-		return NULL;
-		}
-	ctx->my_yyscanner=scanner;
-	json_set_debug(1,scanner);	
-
-	json_parse(ctx);	
-	yylex_destroy(scanner);
-	return ctx->node;
+	if(s==NULL || length==0) return NULL;
+	input_string=(char*)s;
+	input_length=length;
+	file_as_input=NULL;
+	return _parse(this);
 	}
 
-JSONNodePtr jsonNParse(const char* s,int length)
+NodePtr Parser::parse(FILE* in)
 	{
-	BisonContext ctx;
-	if(s==NULL) return NULL;
-	memset(&ctx,0,sizeof(BisonContext));
-	ctx.input_string=(char*)s;
-	ctx.input_length=length;
-	
-	return _parse(&ctx);
-	}
-
-JSONNodePtr jsonParseFile(FILE* in)
-	{
-	BisonContext ctx;
 	if(in==NULL) return NULL;
-	memset(&ctx,0,sizeof(BisonContext));
-	ctx.file_as_input=in;
-	return _parse(&ctx);
+	file_as_input=in;
+	input_string=NULL;
+	return _parse(this);
 	}
 
 
-JSONNodePtr jsonParse(const char* s)
+NodePtr Parser::parse(const char* s)
 	{
 	if(s==NULL) return NULL;
 	return jsonNParse(s,strlen(s));
