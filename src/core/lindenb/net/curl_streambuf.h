@@ -14,28 +14,43 @@ namespace lindenb
 namespace net
 {
 
-#define WHERE std::cerr << __FILE__ <<":" << __LINE__ <<":" << __FUNCTION__<< std::endl
-
-		
-static size_t xxx(void *ptr, size_t size, size_t nmemb, void *userp)
-	{
-	WHERE;
-	return size*nmemb;
-	}		
-		
+/**
+ * name:
+ * 	curl_streambuf
+ *
+ * author:
+ *	Pierre Lindenbaum PhD. (2010)
+ *	http://plindenbaum.blogspot.com
+ *	plindenbaum@yahoo.fr
+ *
+ * usage:
+ *	curl_streambuf buf("http://anywhere.org");
+ * 	std::istream in(&buf);
+ */
 class curl_streambuf : public std::basic_streambuf<char>
 	{
 	private:
+		/** url */
+		std::string url;
+		/** current state: 0 init, 1 fetch, -1 EOF */
 		int state;
+		/** CURL ptr */
 		CURL *curl_handle;
+		/** CURLM ptr */
 		CURLM *multi_handle;
+		/** the buffer for streambug */
 		char* buffer;
+		/** size of the buffer for streambug */
 		unsigned int buffer_size;
+		/**  number of CURL running */
 		int still_running;
+		/** check callback was called once */
+		bool callback_was_called;
 		
+		/** called by the CURL  callback */
 		size_t call(void *ptr, size_t size, size_t nmemb)
 			{
-			WHERE;
+			this->callback_was_called=true;
 			this->buffer_size = size*nmemb;
 			char *array=(char*)std::realloc(this->buffer,this->buffer_size);
 			if(array==NULL) throw std::runtime_error("out of memory");
@@ -48,76 +63,39 @@ class curl_streambuf : public std::basic_streambuf<char>
 			return this->buffer_size;
 			}
 		
-		
-		static size_t callback(void *ptr, size_t size, size_t nmemb, void *userp)
+		/** call back called by libCURL */
+		static size_t write_callback(void *ptr, size_t size, size_t nmemb, void *userp)
 			{
-			WHERE;
 			return ((curl_streambuf *)userp)->call(ptr,  size, nmemb);
 			}
 		
-		static int curl_debug_callback(CURL *, curl_infotype, char *, size_t, void *)
-			{
-			WHERE;
-			return 0;
-			}
-		
-		void _error(CURLcode code)
+		void check_error(CURLcode code)
 			{
 			if(code!=CURLE_OK)
 				{
-				std::cerr << "boum"<< ::curl_easy_strerror(code) << std::endl;
 				throw std::runtime_error(::curl_easy_strerror(code));
 				}
 			}
-		void _error(CURLMcode code)
+		void check_error(CURLMcode code)
 			{
 			if(code!=CURLM_OK)
 				{
-				std::cerr << "boum"<<code << std::endl;
+				throw std::runtime_error(::curl_multi_strerror(code));
 				}
 			}
 		
-		void _init(const char* uri)
+		
+	public:
+		/** constructor from a valid url */
+		curl_streambuf(const char* url):url(url),
+				state(0),
+				curl_handle(NULL),
+				buffer(NULL),
+				buffer_size(0)
 			{
-			assert(uri!=NULL);
-			std::cerr << "uri is "<< uri << std::endl;
-			WHERE;
-			this->state=0;
-			this->buffer_size=0;
-			this->still_running=0;
-			
-			this->curl_handle=::curl_easy_init( );
-			if(this->curl_handle==NULL)
-				{
-				throw std::runtime_error("curl_easy_init failed");
-				}
-			
-			WHERE;
-	
-			CURLcode ret=::curl_easy_setopt(this->curl_handle, CURLOPT_URL, uri);
-			_error(ret);
-			ret=::curl_easy_setopt(this->curl_handle, CURLOPT_WRITEFUNCTION,xxx); 
-			_error(ret);
-			ret=::curl_easy_setopt(this->curl_handle, CURLOPT_VERBOSE, 1); 
-			_error(ret);
-			ret=::curl_easy_setopt(this->curl_handle, CURLOPT_WRITEDATA, this); 
-			_error(ret);
-			ret=::curl_easy_setopt(this->curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
-			_error(ret);
-			
-			this->multi_handle=::curl_multi_init();
-			if(this->multi_handle==NULL)
-				{
-				WHERE;
-				:: curl_easy_cleanup(this->curl_handle);
-				this->curl_handle=NULL;
-				throw std::runtime_error("curl_multi_init failed");
-				}
-			CURLMcode ret2=::curl_multi_add_handle(this->multi_handle, this->curl_handle);
-			_error(ret2);
-			WHERE;
 			
 			
+			/* alloc the buffer */
 			this->buffer=(char*)std::malloc(BUFSIZ);
 			if(this->buffer==NULL)
 				{
@@ -131,14 +109,8 @@ class curl_streambuf : public std::basic_streambuf<char>
 				&this->buffer[BUFSIZ]
 				);
 			}
-
-	
-	public:
-		curl_streambuf(const char* url)
-			{
-			_init(url);
-			}
-	
+		
+		/** destructor */
 		virtual ~curl_streambuf()
 			{
 			if(this->multi_handle!=NULL)
@@ -164,38 +136,75 @@ class curl_streambuf : public std::basic_streambuf<char>
 		
 		virtual int underflow ( )
 			{
-			WHERE;
+			CURLcode ret;
+			CURLMcode ret2;
 			switch(this->state)
 				{
 				case -1: return EOF;break;
+				case 0:
+					{
+					this->state=1;
+					this->buffer_size=0;
+					this->still_running=0;
+					
+					/* init curl */
+					this->curl_handle=::curl_easy_init( );
+					if(this->curl_handle==NULL)
+						{
+						throw std::runtime_error("::curl_easy_init failed");
+						}
+					
+					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_URL, this->url.c_str());
+					check_error(ret);
+					
+					
+					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_VERBOSE, 1); 
+					check_error(ret);
+					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_WRITEDATA, this); 
+					check_error(ret);
+					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0");
+					check_error(ret);
+					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_WRITEFUNCTION,
+						curl_streambuf::write_callback
+						); 
+					check_error(ret);
+					
+					
+					this->multi_handle=::curl_multi_init();
+					if(this->multi_handle==NULL)
+						{
+						:: curl_easy_cleanup(this->curl_handle);
+						this->curl_handle=NULL;
+						throw std::runtime_error("curl_multi_init failed");
+						}
+					
+					ret2=::curl_multi_add_handle(
+						this->multi_handle,
+						this->curl_handle
+						);
+					check_error(ret2);
+					this->still_running=1;
+					//threw
+					}
 				default:
 					{
-					WHERE;
-					CURLMcode ret= ::curl_multi_perform(this->multi_handle,&( this->still_running));
+					this->buffer_size=0;
 					
-					std::cerr << "ret=" << ret << "n="<< still_running << std::endl;
-					if(ret==CURLM_CALL_MULTI_PERFORM)
-						{WHERE;
-						if( this->buffer_size==0)
-							{WHERE;
-							this->state=-1;
-							return EOF;
-							}
-						return this->buffer[0];
+					do
+						{
+						this->callback_was_called=false;
+						ret2= ::curl_multi_perform(this->multi_handle,&( this->still_running));
+						} while( this->still_running!=0 && this->callback_was_called==false);
+					
+					
+					if( this->buffer_size==0)
+						{
+						this->state=-1;
+						return EOF;
 						}
-					WHERE;
-					this->state=-1;
-					return EOF;
-					break;
+					return this->buffer[0];
 					}
 				}
-			
-			
-
-			
-				
-			
-			
 			}
 	};
 
