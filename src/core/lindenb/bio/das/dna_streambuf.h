@@ -16,8 +16,10 @@ namespace lindenb { namespace bio { namespace das {
  *	plindenbaum@yahoo.fr
  *
  * usage:
- *	dna_streambuf buf(in);
- * 	std::istream in(&buf);
+ *	lindenb::net::curl_streambuf curl("http://genome.ucsc.edu/cgi-bin/das/hg19/dna?segment=chr1:100000,100100");
+ *	std::istream in_net(&curl);
+ *	lindenb::bio::das::dna_streambuf dasdna(in_net);
+ *	std::istream in_das(&dasdna);
  */
 class dna_streambuf:public std::streambuf
 	{
@@ -82,7 +84,7 @@ class dna_streambuf:public std::streambuf
 				);
 			}
 		
-		~dna_streambuf()
+		virtual ~dna_streambuf()
 			{
 			_priv_close();
 			}

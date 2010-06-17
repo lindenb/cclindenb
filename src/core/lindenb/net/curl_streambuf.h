@@ -3,7 +3,6 @@
 #include <string>
 #include <iostream>
 #include <stdexcept>
-#include <zlib.h>
 #include <streambuf>
 #include <cstdlib>
 #include <cstring>
@@ -57,7 +56,7 @@ class curl_streambuf : public std::basic_streambuf<char>
 			this->buffer=array;
 			std::memcpy((void*)this->buffer, ptr, this->buffer_size);
 			setg(	(char*)this->buffer,
-				(char*)&this->buffer[1],//1 not 0, 0 will be returned in underflow
+				(char*)&this->buffer[0],//1 not 0, 0 will be returned in underflow
 				(char*)&this->buffer[this->buffer_size]
 				);
 			return this->buffer_size;
@@ -158,7 +157,7 @@ class curl_streambuf : public std::basic_streambuf<char>
 					check_error(ret);
 					
 					
-					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_VERBOSE, 1); 
+					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_VERBOSE, 0); 
 					check_error(ret);
 					ret=::curl_easy_setopt(this->curl_handle, CURLOPT_WRITEDATA, this); 
 					check_error(ret);
