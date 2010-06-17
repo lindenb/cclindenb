@@ -56,7 +56,7 @@ class curl_streambuf : public std::basic_streambuf<char>
 			this->buffer=array;
 			std::memcpy((void*)this->buffer, ptr, this->buffer_size);
 			setg(	(char*)this->buffer,
-				(char*)&this->buffer[0],//1 not 0, 0 will be returned in underflow
+				(char*)&this->buffer[0],
 				(char*)&this->buffer[this->buffer_size]
 				);
 			return this->buffer_size;
