@@ -25,7 +25,10 @@ namespace json
 		};
 	
 
-	
+	/**
+	 * An Abstract JSON node
+	 *
+	 */
 	typedef class Node
 		{
 		protected:
@@ -38,6 +41,16 @@ namespace json
 			virtual node_type type() const=0;
 			virtual std::ostream& print(std::ostream& out) const=0;
 			virtual std::ostream& write(std::ostream& out) const=0;
+			bool isNil() const { return type()==nil;}
+			bool isBool() const { return type()==boolean;}
+			bool isFloating() const { return type()==floating;}
+			bool isDouble() const { return isFloating();}
+			bool isInteger() const { return type()==integer;}
+			bool isNumber() const { return isInteger() || isFloating();}
+			bool isString() const { return type()==string;}
+			bool isArray() const { return type()==array;}
+			bool isObject() const { return type()==object;}
+			
 		friend std::ostream& operator<< (std::ostream& o,Node  const& object);
 		}*NodePtr;
 	

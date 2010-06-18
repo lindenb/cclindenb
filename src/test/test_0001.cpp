@@ -1,10 +1,17 @@
 #include <fstream>
 #include <sstream>
 #include "lindenb/bio/das/dna_streambuf.h"
+#include "lindenb/bio/genetic_code.h"
 #include "lindenb/net/curl_streambuf.h"
 #include "lindenb/json/json.h"
 
 static const char *url1="http://genome.ucsc.edu/cgi-bin/das/hg19/dna?segment=chr1:100000,100100";
+
+static void test0004()
+	{
+	lindenb::bio::StandardGeneticCode code;
+	std::cout << code.translate('A','A','a') << code('A','T','G')<< std::endl;
+	}
 
 static void test0003()
 	{
@@ -46,8 +53,9 @@ int main(int argc,char** argv)
 	{
 	try
 		{
+		test0004();
+		std::cout << g_delim  << std::endl;
 		test0003();
-		return 0;
 		std::cout << g_delim  << std::endl;
 		test0002();
 		std::cout << g_delim  << std::endl;
