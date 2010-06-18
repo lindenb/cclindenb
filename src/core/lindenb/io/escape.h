@@ -2,8 +2,7 @@
 #define _LINDENB_IO_ESCAPE_H
 #include <string>
 #include <iostream>
-namespace lindenb
-{
+namespace lindenb { namespace io {
 /**
     Motivation:
 	escapes a C string
@@ -37,6 +36,6 @@ std::ostream& operator<< (std::ostream& out, escapeC const& object)
 	return out;
 	}
 
-}
+}}
 
 #endif

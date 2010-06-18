@@ -1,4 +1,4 @@
-CFLAGS=-I ../core `xml2-config  --cflags` `curl-config  --cflags`
+CFLAGS=-Wall -I ../core `xml2-config  --cflags` `curl-config  --cflags`
 LDFLAGS=` xml2-config  --libs` `curl-config  --libs`
 all:tests
 

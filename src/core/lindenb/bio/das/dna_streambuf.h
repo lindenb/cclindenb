@@ -24,8 +24,8 @@ namespace lindenb { namespace bio { namespace das {
 class dna_streambuf:public std::streambuf
 	{
 	private:
-		xmlTextReaderPtr reader;
 		std::istream& in;
+		xmlTextReaderPtr reader;
 		/** state 0:init 1:in dna -1:EOF */
 		int state;
 		/** streambuf buffer */
@@ -63,14 +63,15 @@ class dna_streambuf:public std::streambuf
 			return ((dna_streambuf*)(context))->inputReadCallback(buffer,len);
 			}
 		
-		void closeCallback()
+		int closeCallback()
 			{
 			_priv_close(); 
+			return 0;
 			}
 		
 		static int xmlInputCloseCallback(void * context)
 			{
-			((dna_streambuf*)(context))->closeCallback();
+			return ((dna_streambuf*)(context))->closeCallback();
 			}
 	public:
 		dna_streambuf(std::istream& in):std::streambuf(),in(in),reader(NULL),state(0),buffer(NULL)

@@ -6,8 +6,7 @@
 #include <stdexcept>
 #include <cstring>
 
-namespace lindenb
-{
+namespace lindenb { namespace io {
 /**
     Motivation:
 	a  simple queue-based Lexer
@@ -20,6 +19,7 @@ class Lexer
 		std::istream& in;
 		std::vector<char> buffer;
 	public:
+		typedef std::vector<char>::size_type size_type; 
 		Lexer(std::istream& in):in(in)
 			{
 			
@@ -41,6 +41,7 @@ class Lexer
 			return c;
 			}
 		
+		/** skip all withspaces, returns the next get() character */
 		int skipWhitespaces()
 			{
 			int c;
@@ -61,7 +62,7 @@ class Lexer
 		/** return the index-th char without removing it from the stack */
 		int get(int index)
 			{
-			while(buffer.size()<=index)
+			while(buffer.size()<=(size_type)index)
 				{
 				int c= in.get();
 				if(c==EOF) return EOF;
@@ -90,8 +91,8 @@ class Lexer
 		
 		bool inAvail(int index,const char* s)
 			{
-			size_t len=std::strlen(s);
-			for(int i=0;i< len;++i)
+			std::size_t len=std::strlen(s);
+			for(std::size_t i=0;i< (std::size_t)len;++i)
 				{
 				if(get(index+i)!=s[i]) return false;
 				}
@@ -102,13 +103,13 @@ class Lexer
 		int consumme(const int index,const int n)
 			{
 			int n_read=0;
-			while(	 buffer.size()<index )
+			while(	(int) buffer.size()< index )
 				{
 				int c= in.get();
 				if(c==EOF) return 0;
 				buffer.push_back((char)c);
 				}
-			while(	n_read<n && buffer.size()>index )
+			while(	n_read<n && (int)buffer.size()>index )
 				{
 				n_read++;
 				buffer.erase(buffer.begin()+index);
@@ -130,9 +131,25 @@ class Lexer
 			{
 			return get()==EOF;
 			}
+		std::string toString(int i)
+			{
+			std::string str;
+			for(int j=0;j< i;++j)
+				{
+				int c=get(j);
+				if(c==EOF) { str.append("<<EOF>>"); break; }
+				str+=(char)c;
+				}
+			return str;
+			}
+		
+		std::string toString()
+			{
+			return toString(20);
+			}
 		};
 
 
-}
+}}//namespaces
 
 #endif
