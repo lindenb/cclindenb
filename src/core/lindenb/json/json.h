@@ -53,6 +53,7 @@ namespace json
 			bool isArray() const { return type()==array;}
 			bool isObject() const { return type()==object;}
 			virtual Node* clone() const=0;
+			virtual bool equals(const Node* object) const=0; 
 		friend std::ostream& operator<< (std::ostream& o,Node  const& object);
 		}*NodePtr;
 	
@@ -79,6 +80,8 @@ namespace json
 				out << value();
 				return out;
 				}
+			virtual bool equals(const Node* object) const=0;
+			virtual Node* clone() const=0;
 		};
 	
 	
@@ -97,6 +100,12 @@ namespace json
 				{
 				return new NilNode();
 				}
+			virtual bool equals(const Node* object) const
+				{
+				if(object==this) return true;
+				if(object==NULL  || object->type()!=this->type()) return false;
+				return true;
+				}
 		}*NilNodePtr;
 	
 	typedef class BoolNode:public GenericNode<bool>
@@ -113,6 +122,12 @@ namespace json
 			virtual Node* clone() const
 				{
 				return new BoolNode(value());
+				}
+			virtual bool equals(const Node* object) const
+				{
+				if(object==this) return true;
+				if(object==NULL  || object->type()!=this->type()) return false;
+				return value()==((BoolNode*)object)->value();
 				}
 		}*BoolNodePtr;
 	
@@ -135,6 +150,12 @@ namespace json
 				{
 				return new StringNode(value());
 				}
+			virtual bool equals(const Node* object) const
+				{
+				if(object==this) return true;
+				if(object==NULL  || object->type()!=this->type()) return false;
+				return value().compare(((StringNode*)object)->value())==0;
+				}
 		}*StringNodePtr;
 	
 	
@@ -150,6 +171,12 @@ namespace json
 				{
 				return new IntegerNode(value());
 				}
+			virtual bool equals(const Node* object) const
+				{
+				if(object==this) return true;
+				if(object==NULL  || object->type()!=this->type()) return false;
+				return value()==((IntegerNode*)object)->value();
+				}
 		}*IntegerNodePtr;
 	
 	
@@ -162,6 +189,12 @@ namespace json
 			virtual Node* clone() const
 				{
 				return new DoubleNode(value());
+				}
+			virtual bool equals(const Node* object) const
+				{
+				if(object==this) return true;
+				if(object==NULL  || object->type()!=this->type()) return false;
+				return value()==((DoubleNode*)object)->value();
 				}
 		}*DoubleNodePtr;
 	
@@ -217,6 +250,21 @@ namespace json
 						);
 					}
 				return node;
+				}
+			virtual bool equals(const Node* object) const
+				{
+				if(object==this) return true;
+				if(object==NULL  || object->type()!=this->type()) return false;
+				ArrayNode* other=((ArrayNode*)object);
+				if(size()!=other->size()) return false;
+				for(size_type i=0;i< size();++i)
+					{
+					if( vector().at(i)->equals( other->vector().at(i) )==false)
+						{
+						return false;
+						}
+					}
+				return true;
 				}
 		}*ArrayNodePtr;
 	
@@ -278,6 +326,24 @@ namespace json
 					node->children.insert(std::pair<std::string,NodePtr>(r->first,r->second->clone()));
 					}
 				return node;
+				}
+			virtual bool equals(const Node* object) const
+				{
+				if(object==this) return true;
+				if(object==NULL  || object->type()!=this->type()) return false;
+				ObjectNode* other=((ObjectNode*)object);
+				if(size()!=other->size()) return false;
+				std::map<std::string,NodePtr>::const_iterator r=children.begin();
+				std::map<std::string,NodePtr>::const_iterator r_end=children.end();
+				std::map<std::string,NodePtr>::const_iterator r2=other->children.begin();
+				while(r!=r_end)
+					{
+					if( r->first.compare(r2->first)!=0) return false;
+					if( r->second->equals(r2->second)==false) return false;
+					++r;
+					++r2;
+					}
+				return true;
 				}
 		}*ObjectNodePtr;
 
