@@ -15,71 +15,12 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include "lindenb/io/binding.h"
 #include <gdbm.h>
 
-namespace lindenb
-	{
-namespace gdbm
-	{
+namespace lindenb { namespace gdbm {
 	
-template<typename T>
-class TupleBinding
-	{
-	public:
-		virtual void objectToEntry(const T& object,datum* entry)=0;
-		virtual void release(datum* entry)=0;
-		virtual std::auto_ptr<T> entryToObject(const datum* entry)=0;
-	};
 
-
-
-template<typename T>
-class CopyBinding:public TupleBinding<T>
-	{
-	public:
-		virtual void objectToEntry(const T& object,datum* entry)
-			{
-			entry->dptr=(char*)&object;
-			entry->dsize=sizeof(T);
-			}
-		virtual void release(datum* entry)
-			{
-			
-			}
-		virtual std::auto_ptr<T> entryToObject(const datum* entry)
-			{
-			T *ptr=new T;
-			std::memcpy(ptr,entry->dptr,sizeof(T));
-			return std::auto_ptr<T>(ptr);
-			}
-	};
-
-class StringBinding:public TupleBinding<std::string>
-	{
-	public:
-		virtual void objectToEntry(const std::string& object,datum* entry)
-			{
-			std::string::size_type len=object.size();
-			entry->dsize=sizeof(std::string::size_type)+len;
-			entry->dptr=new char[entry->dsize];
-			std::memcpy(&entry->dptr[0],&len,sizeof(std::string::size_type));
-			object.copy(&entry->dptr[sizeof(std::string::size_type)],len);
-			}
-		virtual void release(datum* entry)
-			{
-			delete entry->dptr;
-			}
-		virtual std::auto_ptr<std::string> entryToObject(const datum* entry)
-			{
-			std::string::size_type len;
-			std::memcpy(&len,&entry->dptr[0],sizeof(std::string::size_type));
-			std::string *ptr=new std::string(
-				&(entry->dptr[sizeof(std::string::size_type)]),
-				len
-				);
-			return std::auto_ptr<std::string>(ptr);
-			}
-	};
 
 template<typename K,typename V>
 class Database
@@ -100,15 +41,37 @@ class Database
 		
 	private:
 		GDBM_FILE dbf;
-		TupleBinding<K> *keyBinding;
-		TupleBinding<V> *dataBinding;
+		lindenb::io::TupleBinding<K> *keyBinding;
+		lindenb::io::TupleBinding<V> *dataBinding;
 		read_write read_write_mode;
+		
+		class inbuff:public std::streambuf
+			{
+			private:
+				const datum entry;
+				int nRead;
+				
+			public:
+				inbuff(const datum entry):std::streambuf(),entry(entry),nRead(0)
+					{
+					setg(	entry.dptr,
+						entry.dptr,
+						&(entry.dptr[entry.dsize])
+						);
+					}
+				virtual ~inbuff() {}
+				virtual int underflow()
+					{
+					return EOF;
+					}
+			};
+		
 	protected:
-		TupleBinding<K>* getKeyBinding()	
+		lindenb::io::TupleBinding<K>* getKeyBinding()	
 			{
 			return this->keyBinding;
 			}
-		TupleBinding<V>* getDataBinding()
+		lindenb::io::TupleBinding<V>* getDataBinding()
 			{
 			return this->dataBinding;
 			}
@@ -122,7 +85,19 @@ class Database
 			}		
 		
 	private:	
+		std::string serializeKey(const K* key)
+			{
+			std::ostringstream out;
+			getKeyBinding()->writeObject(out,key);
+			return out.str();
+			}
 		
+		std::string serializeData(const V* value)
+			{
+			std::ostringstream out;
+			getDataBinding()->writeObject(out,value);
+			return out.str();
+			}
 		
 		void _priv_open(const char* filename,int block_size,read_write read_write,int mode,void (*fatal_func)())
 			{
@@ -170,7 +145,9 @@ class Database
 			{
 			datum content = ::gdbm_fetch(db(), key);
 			if(content.dptr==NULL) return std::auto_ptr<V>(NULL);
-			std::auto_ptr<V> v= getDataBinding()->entryToObject(&content);
+			inbuff buff(key);
+			std::istream in(&buff);
+			std::auto_ptr<V> v= getDataBinding()->readObject(in);
 			std::free(content.dptr);
 			return v;
 			}
@@ -180,26 +157,28 @@ class Database
 			{
 			datum key_entry;
 			datum value_entry;
-			getKeyBinding()->objectToEntry(key,&key_entry);
-			getDataBinding()->objectToEntry(value,&value_entry);
+			std::string SK= serializeKey(&key);
+			key_entry.dptr = (char*)SK.data();
+			key_entry.dsize = (int)SK.size();
+			std::string SV= serializeData(&value);
+			value_entry.dptr = (char*)SV.data();
+			value_entry.dsize = (int)SV.size();
 			bool  success = ::gdbm_store(db(), key_entry, value_entry, flag)==0;
-			getKeyBinding()->release(&key_entry);
-			getDataBinding()->release(&value_entry);
 			return success;
 			}
 	
 	public:		
 		Database(const char* filename,int block_size,read_write rw,int mode,void (*fatal_func)(),
-			TupleBinding<K> *kBinding,
-			TupleBinding<V> *vBinding
+			lindenb::io::TupleBinding<K> *kBinding,
+			lindenb::io::TupleBinding<V> *vBinding
 			):keyBinding(kBinding),dataBinding(vBinding)
 			{
 			_priv_open(filename,block_size,rw,mode,fatal_func);
 			}
 		
 		Database(const char* filename,
-			TupleBinding<K> *kBinding,
-			TupleBinding<V> *vBinding
+			lindenb::io::TupleBinding<K> *kBinding,
+			lindenb::io::TupleBinding<V> *vBinding
 			)
 			{
 			_priv_open(filename,0,DEFAULT_READWRITE,DEFAULT_MODE,NULL);
@@ -243,27 +222,30 @@ class Database
 		bool remove(const K& key)
 			{
 			datum entry;
-			getKeyBinding()->objectToEntry(key,&entry);
+			std::string SK= serializeKey(key);
+			entry.dptr = (char*)SK.data();
+			entry.dsize = (int)SK.size();
 			int ret = ::gdbm_delete(db(), entry)==0;
-			getKeyBinding()->release(&entry);
 			return ret;
 			}
 		/** returns true if the database contains the given key */
 		bool contains(const K& key)
 			{
 			datum entry;
-			keyBinding->objectToEntry(key,&entry);
+			std::string SK= serializeKey(&key);
+			entry.dptr = (char*)SK.data();
+			entry.dsize = (int)SK.size();
 			bool exists = ::gdbm_exists(db(), entry) == 1;//returns 1 if key exists
-			keyBinding->release(&entry);
 			return exists;
 			}
 		/** returns the value for the given key or NULL */
 		std::auto_ptr<V> get(const K& key)
 			{
 			datum entry;
-			getKeyBinding()->objectToEntry(key,&entry);
+			std::string SK= serializeKey(&key);
+			entry.dptr = (char*)SK.data();
+			entry.dsize = (int)SK.size();
 			std::auto_ptr<V> val = _get( entry);
-			getKeyBinding()->release(&entry);
 			return val;
 			}
 		
@@ -310,13 +292,16 @@ class Database
 				std::auto_ptr<K> first()
 					{
 					if(key.dptr==NULL) return std::auto_ptr<K>();
-					return owner->getKeyBinding()->entryToObject(&key);
+					
+					inbuff buff(key);
+					std::istream in(&buff);
+					return std::auto_ptr<K>(owner->getDataBinding()->readObject(in));
 					}
 				
 				std::auto_ptr<V> second()
 					{
 					if(key.dptr==NULL) return std::auto_ptr<V>();
-					return owner->_get(key);
+					return std::auto_ptr<V>(owner->_get(key));
 					}
 			};
 		

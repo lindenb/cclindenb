@@ -48,7 +48,7 @@ class stdio_streambuf : public std::basic_streambuf<char>
 			_init(BUFSIZ);
 			}
 			
-		~stdio_streambuf()
+		virtual ~stdio_streambuf()
 			{
 			if(this->buffer!=NULL)
 				{

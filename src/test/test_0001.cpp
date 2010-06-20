@@ -8,6 +8,12 @@
 
 static const char *url1="http://genome.ucsc.edu/cgi-bin/das/hg19/dna?segment=chr1:100000,100100";
 
+
+static void test0006()
+	{
+	lindenb::io::StringBinding sb;
+	}
+
 static void test0005()
 	{
 	std::string s;
@@ -24,8 +30,8 @@ static void test0004()
 
 static void test0003()
 	{
-	//std::string json="[\"hello'\t\n\",null,false,true,{},{'id':false,'_azd':-998,'id2':28.11E14,'id3':0}] " ;
-	std::string json="{'id':122,'id2':null}";
+	std::string json="[\"hello'\t\n\",null,false,true,{},{'id':false,'_azd':-998,'id2':28.11E14,'id3':0}] " ;
+	//std::string json="{'id':122,'id2':null}";
 	std::istringstream in(json);
 	lindenb::json::Parser parser(in);
 	lindenb::json::NodePtr node=parser.parse();
@@ -40,7 +46,7 @@ static void test0003()
 	binding.writeObject(os,node);
 	std::string s=os.str();
 	std::istringstream is(s);
-	node2= binding.readObject(is);
+	node2= binding.readObject(is).release();
 	std::cout << (*node2) << std::endl;
 	delete node2;
 	delete node;
@@ -76,6 +82,7 @@ int main(int argc,char** argv)
 	{
 	try
 		{
+		test0006();
 		test0005();
 		test0004();
 		std::cout << g_delim  << std::endl;

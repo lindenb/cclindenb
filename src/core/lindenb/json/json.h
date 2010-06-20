@@ -629,7 +629,7 @@ class	Parser: public lindenb::io::Lexer
  *
  * JSONBinding
  */
-class JSONBinding: public lindenb::io::TupleBinding<NodePtr>
+class JSONBinding: public lindenb::io::TupleBinding<Node>
 	{
 	public:
 		/** JSONBinding */
@@ -641,18 +641,18 @@ class JSONBinding: public lindenb::io::TupleBinding<NodePtr>
 			{
 			}
 		/** readObject */
-		virtual  NodePtr readObject(std::istream& in)
+		virtual  std::auto_ptr<Node> readObject(std::istream& in)
 			{
 			unsigned char t;
 			read(in,(char*)&t,sizeof(unsigned char));
 			
 			switch((node_type)t)
 				{
-				case nil:return new NilNode(); break;//nothing todo
-				case boolean: return new BoolNode(readBool(in));break;
-				case integer: return new IntegerNode(readLong(in));break;
-				case floating: return new DoubleNode(readDouble(in));break;
-				case string: return new StringNode(readString(in)); break;	
+				case nil:return std::auto_ptr<Node>(new NilNode()); break;//nothing todo
+				case boolean: return std::auto_ptr<Node>(new BoolNode(readBool(in)));break;
+				case integer: return  std::auto_ptr<Node>(new IntegerNode(readLong(in)));break;
+				case floating: return std::auto_ptr<Node>(new DoubleNode(readDouble(in)));break;
+				case string: return std::auto_ptr<Node>(new StringNode(*readString(in))); break;	
 				case array:
 					{
 					ArrayNodePtr array=new ArrayNode();
@@ -660,9 +660,9 @@ class JSONBinding: public lindenb::io::TupleBinding<NodePtr>
 					read(in,(char*)&n,sizeof(ArrayNode::size_type));
 					for(ArrayNode::size_type i=0;i< n;++i)
 						{
-						array->vector().push_back(readObject(in));
+						array->vector().push_back(readObject(in).release());
 						}
-					return array;
+					return std::auto_ptr<Node>(array);
 					break;
 					}
 				case object:
@@ -673,22 +673,22 @@ class JSONBinding: public lindenb::io::TupleBinding<NodePtr>
 					
 					for(std::map<std::string,NodePtr>::size_type i=0;i< n;++i)
 						{
-						std::string key=readString(in);
-						NodePtr value=readObject(in);
+						std::string* key=readString(in);
+						NodePtr value=readObject(in).release();
 						
-						map->map().insert(std::pair<std::string,NodePtr>(key,value));
+						map->map().insert(std::pair<std::string,NodePtr>(*key,value));
 						}
-					return map;
+					return std::auto_ptr<Node>(map);
 					break;
 					}
 				default:throw std::runtime_error("bad type");
 				}
 			
 			throw std::runtime_error("should never happen");
-			return NULL;
+			return  std::auto_ptr<Node>();
 			}
 		/** abstract; write object to output stream */
-		virtual void writeObject(std::ostream& out,const NodePtr &myobject)
+		virtual void writeObject(std::ostream& out,const Node* myobject)
 			{
 			unsigned char t=(unsigned char)myobject->type();
 			write(out,(const char*)&t,sizeof(unsigned char));
@@ -698,7 +698,7 @@ class JSONBinding: public lindenb::io::TupleBinding<NodePtr>
 				case boolean: writeBool(out, ((const BoolNodePtr)myobject)->value());break;
 				case integer: writeLong(out, ((const IntegerNodePtr)myobject)->value());break;
 				case floating: writeDouble(out, ((const DoubleNodePtr)myobject)->value());break;
-				case string: writeString(out, ((const StringNodePtr)myobject)->value());break;
+				case string: writeString(out, (&((const StringNodePtr)myobject)->value()));break;
 				case array:
 					{
 					const ArrayNodePtr array=(const ArrayNodePtr)myobject;
@@ -719,7 +719,7 @@ class JSONBinding: public lindenb::io::TupleBinding<NodePtr>
 						r!=map->map().end();
 						++r)
 						{
-						writeString(out,r->first);
+						writeString(out,&(r->first));
 						writeObject(out,r->second);
 						}
 					break;
