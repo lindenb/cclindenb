@@ -1,11 +1,20 @@
 #include <fstream>
 #include <sstream>
+#include <cassert>
 #include "lindenb/bio/das/dna_streambuf.h"
 #include "lindenb/bio/genetic_code.h"
 #include "lindenb/net/curl_streambuf.h"
 #include "lindenb/json/json.h"
 
 static const char *url1="http://genome.ucsc.edu/cgi-bin/das/hg19/dna?segment=chr1:100000,100100";
+
+static void test0005()
+	{
+	std::string s;
+	for(int i=0;i< 10;++i) s+='\0';
+	assert(s.size()==10);
+	assert(std::strlen(s.c_str())==0);
+	}
 
 static void test0004()
 	{
@@ -15,12 +24,26 @@ static void test0004()
 
 static void test0003()
 	{
-	std::string json="[\"hello'\t\n\",null,false,true,{},{'id':false,'_azd':-998,'id2':28.11E14,'id3':0}] " ;
+	//std::string json="[\"hello'\t\n\",null,false,true,{},{'id':false,'_azd':-998,'id2':28.11E14,'id3':0}] " ;
+	std::string json="{'id':122,'id2':null}";
 	std::istringstream in(json);
 	lindenb::json::Parser parser(in);
 	lindenb::json::NodePtr node=parser.parse();
 	parser.eof();
 	std::cout << (*node) << std::endl;
+	lindenb::json::NodePtr node2=node->clone();
+	std::cout << (*node2) << std::endl;
+	delete node2;
+	
+	std::ostringstream os;
+	lindenb::json::JSONBinding binding;
+	binding.writeObject(os,node);
+	std::string s=os.str();
+	std::istringstream is(s);
+	node2= binding.readObject(is);
+	std::cout << (*node2) << std::endl;
+	delete node2;
+	delete node;
 	}
 	
 static void test0002()
@@ -53,6 +76,7 @@ int main(int argc,char** argv)
 	{
 	try
 		{
+		test0005();
 		test0004();
 		std::cout << g_delim  << std::endl;
 		test0003();

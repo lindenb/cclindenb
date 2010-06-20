@@ -8,20 +8,23 @@
 #include <climits>
 #include <cmath>
 #include "lindenb/io/lexer.h"
+#include "lindenb/io/binding.h"
 #include "lindenb/io/escape.h"
+#include "lindenb/util/debug.h"
+
 namespace lindenb
 {
 namespace json
 	{	
 	enum node_type
 		{
-		nil,
-		boolean,
-		integer,
-		floating,
-		string,
-		array,
-		object
+		nil=1,
+		boolean=2,
+		integer=3,
+		floating=4,
+		string=5,
+		array=6,
+		object=7
 		};
 	
 
@@ -40,7 +43,6 @@ namespace json
 			virtual ~Node() {}
 			virtual node_type type() const=0;
 			virtual std::ostream& print(std::ostream& out) const=0;
-			virtual std::ostream& write(std::ostream& out) const=0;
 			bool isNil() const { return type()==nil;}
 			bool isBool() const { return type()==boolean;}
 			bool isFloating() const { return type()==floating;}
@@ -50,7 +52,7 @@ namespace json
 			bool isString() const { return type()==string;}
 			bool isArray() const { return type()==array;}
 			bool isObject() const { return type()==object;}
-			
+			virtual Node* clone() const=0;
 		friend std::ostream& operator<< (std::ostream& o,Node  const& object);
 		}*NodePtr;
 	
@@ -77,13 +79,6 @@ namespace json
 				out << value();
 				return out;
 				}
-			virtual std::ostream& write(std::ostream& out) const
-				{
-				char tt=(char)type();
-				out.write((const char*)&tt,sizeof(char));
-				out.write((const char*)&value(),sizeof(T));
-				return out;
-				}
 		};
 	
 	
@@ -98,11 +93,9 @@ namespace json
 				out << "null";
 				return out;
 				}
-			virtual std::ostream& write(std::ostream& out) const
+			virtual Node* clone() const
 				{
-				char tt=(char)type();
-				out.write((const char*)&tt,sizeof(char));
-				return out;
+				return new NilNode();
 				}
 		}*NilNodePtr;
 	
@@ -117,7 +110,10 @@ namespace json
 				out << (value()?"true":"false");
 				return out;
 				}
-			
+			virtual Node* clone() const
+				{
+				return new BoolNode(value());
+				}
 		}*BoolNodePtr;
 	
 	
@@ -135,14 +131,9 @@ namespace json
 				out << "\"";
 				return out;
 				}
-			virtual std::ostream& write(std::ostream& out) const
+			virtual Node* clone() const
 				{
-				char tt=(char)type();
-				out.write((const char*)&tt,sizeof(char));
-				std::string::size_type n=value().size();
-				out.write((const char*)&n,sizeof(std::string::size_type));
-				out.write(value().c_str(),n);
-				return out;
+				return new StringNode(value());
 				}
 		}*StringNodePtr;
 	
@@ -155,6 +146,10 @@ namespace json
 			IntegerNode(Node::json_integer_type value):GenericNode<Node::json_integer_type>(value) {}
 			virtual ~IntegerNode() {}
 			virtual node_type type() const { return integer; };
+			virtual Node* clone() const
+				{
+				return new IntegerNode(value());
+				}
 		}*IntegerNodePtr;
 	
 	
@@ -164,6 +159,10 @@ namespace json
 			DoubleNode(Node::json_floating_type value):GenericNode<Node::json_floating_type>(value) {}
 			virtual ~DoubleNode() {}
 			virtual node_type type() const { return floating; };
+			virtual Node* clone() const
+				{
+				return new DoubleNode(value());
+				}
 		}*DoubleNodePtr;
 	
 	typedef class ArrayNode:public Node
@@ -207,17 +206,17 @@ namespace json
 				out << "]";
 				return out;
 				}
-			virtual std::ostream& write(std::ostream& out) const
+			
+			virtual Node* clone() const
 				{
-				char tt=(char)type();
-				out.write((const char*)&tt,sizeof(char));
-				size_type n=size();
-				out.write((const char*)&n,sizeof(std::string::size_type));
+				ArrayNode* node= new ArrayNode();
 				for(size_type i=0;i< size();++i)
 					{
-					vector().at(i)->write(out);
+					node->children.push_back(
+						this->vector().at(i)->clone()
+						);
 					}
-				return out;
+				return node;
 				}
 		}*ArrayNodePtr;
 	
@@ -268,22 +267,17 @@ namespace json
 				out << "}";
 				return out;
 				}
-			virtual std::ostream& write(std::ostream& out) const
+			
+			virtual Node* clone() const
 				{
-				char tt=(char)type();
-				out.write((const char*)&tt,sizeof(char));
-				size_type n=size();
-				out.write((const char*)&n,sizeof(std::string::size_type));
+				ObjectNode* node= new ObjectNode();
 				for(std::map<std::string,NodePtr>::const_iterator r=children.begin();
 					r!=children.end();
 					++r)
 					{
-					std::string::size_type n=r->first.size();
-					out.write((const char*)&n,sizeof(std::string::size_type));
-					out.write(r->first.c_str(),n);
-					r->second->write(out);
+					node->children.insert(std::pair<std::string,NodePtr>(r->first,r->second->clone()));
 					}
-				return out;
+				return node;
 				}
 		}*ObjectNodePtr;
 
@@ -630,6 +624,110 @@ class	Parser: public lindenb::io::Lexer
 			throw std::runtime_error(os.str());
 			}
 	};
-	
+
+/**
+ *
+ * JSONBinding
+ */
+class JSONBinding: public lindenb::io::TupleBinding<NodePtr>
+	{
+	public:
+		/** JSONBinding */
+		JSONBinding()
+			{
+			}
+		/** ~JSONBinding */
+		virtual ~JSONBinding()
+			{
+			}
+		/** readObject */
+		virtual  NodePtr readObject(std::istream& in)
+			{
+			unsigned char t;
+			read(in,(char*)&t,sizeof(unsigned char));
+			
+			switch((node_type)t)
+				{
+				case nil:return new NilNode(); break;//nothing todo
+				case boolean: return new BoolNode(readBool(in));break;
+				case integer: return new IntegerNode(readLong(in));break;
+				case floating: return new DoubleNode(readDouble(in));break;
+				case string: return new StringNode(readString(in)); break;	
+				case array:
+					{
+					ArrayNodePtr array=new ArrayNode();
+					ArrayNode::size_type n;
+					read(in,(char*)&n,sizeof(ArrayNode::size_type));
+					for(ArrayNode::size_type i=0;i< n;++i)
+						{
+						array->vector().push_back(readObject(in));
+						}
+					return array;
+					break;
+					}
+				case object:
+					{
+					ObjectNodePtr map= new ObjectNode();
+					std::map<std::string,NodePtr>::size_type n;
+					read(in,(char*)&n,sizeof(std::map<std::string,NodePtr>::size_type));
+					
+					for(std::map<std::string,NodePtr>::size_type i=0;i< n;++i)
+						{
+						std::string key=readString(in);
+						NodePtr value=readObject(in);
+						
+						map->map().insert(std::pair<std::string,NodePtr>(key,value));
+						}
+					return map;
+					break;
+					}
+				default:throw std::runtime_error("bad type");
+				}
+			
+			throw std::runtime_error("should never happen");
+			return NULL;
+			}
+		/** abstract; write object to output stream */
+		virtual void writeObject(std::ostream& out,const NodePtr &myobject)
+			{
+			unsigned char t=(unsigned char)myobject->type();
+			write(out,(const char*)&t,sizeof(unsigned char));
+			switch(myobject->type())
+				{
+				case nil:break;//nothing todo
+				case boolean: writeBool(out, ((const BoolNodePtr)myobject)->value());break;
+				case integer: writeLong(out, ((const IntegerNodePtr)myobject)->value());break;
+				case floating: writeDouble(out, ((const DoubleNodePtr)myobject)->value());break;
+				case string: writeString(out, ((const StringNodePtr)myobject)->value());break;
+				case array:
+					{
+					const ArrayNodePtr array=(const ArrayNodePtr)myobject;
+					ArrayNode::size_type n=array->size();
+					write(out,(const char*)&n,sizeof(std::vector<NodePtr>::size_type));
+					for(std::vector<NodePtr>::size_type i=0;i< array->size();++i)
+						{
+						writeObject(out,array->vector().at(i));
+						}
+					break;
+					}
+				case object:
+					{
+					const ObjectNodePtr map=((const ObjectNodePtr)myobject);
+					std::map<std::string,NodePtr>::size_type n=map->map().size();
+					write(out,(const char*)&n,sizeof(std::map<std::string,NodePtr>::size_type));
+					for(std::map<std::string,NodePtr>::const_iterator r=map->map().begin();
+						r!=map->map().end();
+						++r)
+						{
+						writeString(out,r->first);
+						writeObject(out,r->second);
+						}
+					break;
+					}
+				default:throw std::runtime_error("bad type");
+				}
+			}
+	};
+
 	}}//namespaces	
 #endif
