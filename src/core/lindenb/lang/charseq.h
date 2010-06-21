@@ -25,6 +25,11 @@ typedef class CharSequence
 		/** returns the length of the sequence */
 		virtual size_type length() const=0;
 
+		virtual bool empty() const
+			{
+			return length()==0;
+			}
+
 		virtual int compare(const CharSequence* other) const
 			{
 			size_type i=0;
@@ -363,15 +368,32 @@ typedef class MallocCharSequence:public MemoryCharSequence
 typedef class StringCharSequence:public CharSequence
 	{
 	private:
-		std::string& _sequence;
+		const std::string& _sequence;
+		const std::string::size_type start;
+		const std::string::size_type end;
 	public:
-		StringCharSequence(std::string& sequence):_sequence(sequence)
+		StringCharSequence(const std::string& sequence):_sequence(sequence),
+			start(0),end(sequence.size())
 			{
 			}
-
+		
+		StringCharSequence(const std::string& sequence,
+			const std::string::size_type begin,
+			const std::string::size_type end
+			):_sequence(sequence),
+			start(begin),end(end)
+			{
+			assert(begin>=0 && begin <=end && end<=sequence.size());
+			}
+		
+		StringCharSequence(const StringCharSequence& cp):_sequence(cp.sequence),
+			start(cp.start),end(cp.end)
+			{
+			}
+	
 		virtual ~StringCharSequence()
 			{
-
+			
 			}
 
 		virtual std::ostream& print(std::ostream& out) const

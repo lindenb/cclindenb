@@ -5,13 +5,17 @@
 #include "lindenb/bio/genetic_code.h"
 #include "lindenb/net/curl_streambuf.h"
 #include "lindenb/json/json.h"
+#include "lindenb/util/split.h"
 
 static const char *url1="http://genome.ucsc.edu/cgi-bin/das/hg19/dna?segment=chr1:100000,100100";
 
 
 static void test0006()
 	{
-	lindenb::io::StringBinding sb;
+	lindenb::util::Split spliter(',');
+	std::vector<std::string> tokens=spliter.split("A,B,C,D,,,,");
+	for(int i=0;i< tokens.size();++i) std::cout << tokens[i] << std::endl;
+	assert(tokens.size()==4);
 	}
 
 static void test0005()
