@@ -145,7 +145,7 @@ class TupleBinding
 			write(out,s->data(),n);
 			}
 			
-		virtual std::string* readString(std::istream& in,std::string* s)
+		virtual std::auto_ptr<std::string> readString(std::istream& in,std::string* s)
 			{
 			std::string::size_type old_size=s->size();
 			std::string::size_type n;
@@ -154,13 +154,12 @@ class TupleBinding
 			//http://stackoverflow.com/questions/1816319
 			s->resize(old_size+n,'\0');
 			read(in,(char*)&(s->data()[old_size]),n);
-			return s;
+			return std::auto_ptr<std::string>(s);
 			}
-		virtual std::string* readString(std::istream& in)
+		virtual std::auto_ptr<std::string> readString(std::istream& in)
 			{
 			std::string* s=new std::string;
-			readString(in,s);
-			return s;
+			return readString(in,s);
 			}
 	};
 

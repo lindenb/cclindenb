@@ -6,6 +6,7 @@
 #include <map>
 #include <vector>
 #include <climits>
+#include <cerrno>
 #include <cmath>
 #include "lindenb/io/lexer.h"
 #include "lindenb/io/binding.h"
@@ -27,6 +28,14 @@ namespace json
 		object=7
 		};
 	
+	//forward declaration
+	class NilNode;
+	class BoolNode;
+	class StringNode;
+	class IntegerNode;
+	class DoubleNode;
+	class ArrayNode;
+	class ObjectNode;
 
 	/**
 	 * An Abstract JSON node
@@ -36,6 +45,7 @@ namespace json
 		{
 		protected:
 			Node() {}
+			
 		public:
 			typedef long json_integer_type;
 			typedef double json_floating_type;
@@ -53,7 +63,39 @@ namespace json
 			bool isArray() const { return type()==array;}
 			bool isObject() const { return type()==object;}
 			virtual Node* clone() const=0;
-			virtual bool equals(const Node* object) const=0; 
+			virtual bool equals(const Node* object) const=0;
+		protected:
+			void cktype(node_type t) const
+				{
+				if(t!=type())
+					{
+					std::ostringstream os;
+					os << "JSON node is type=" << type()
+				           << "but was casted as " << t;
+				        throw new std::runtime_error(os.str());
+					}
+				}
+		public:
+			virtual NilNode* asNil() { cktype(nil); return (NilNode*)this;};
+			virtual BoolNode* asBool() { cktype(boolean); return (BoolNode*)this;};
+			virtual StringNode* asString() { cktype(string); return (StringNode*)this;};
+			virtual IntegerNode* asInteger() { cktype(integer); return (IntegerNode*)this;};
+			virtual DoubleNode* asDouble() { cktype(floating); return (DoubleNode*)this;};
+			virtual ArrayNode* asArray() { cktype(array); return (ArrayNode*)this;};
+			virtual ObjectNode* asObject() { cktype(object); return (ObjectNode*)this;};
+			
+			virtual const NilNode* asNil() const { cktype(nil); return (const NilNode*)this;};
+			virtual const BoolNode* asBool() const { cktype(boolean); return (const BoolNode*)this;};
+			virtual const StringNode* asString() const { cktype(string); return (const StringNode*)this;};
+			virtual const IntegerNode* asInteger() const { cktype(integer); return (const IntegerNode*)this;};
+			virtual const DoubleNode* asDouble() const { cktype(floating); return (const DoubleNode*)this;};
+			virtual const ArrayNode* asArray() const { cktype(array); return (const ArrayNode*)this;};
+			virtual const ObjectNode* asObject() const { cktype(object); return (const ObjectNode*)this;};
+			virtual const Node* find(const char* path) const
+				{
+				return NULL;
+				}
+			
 		friend std::ostream& operator<< (std::ostream& o,Node  const& object);
 		}*NodePtr;
 	
@@ -222,12 +264,27 @@ namespace json
 				return children;
 				}
 			
+			virtual NodePtr at(size_type i)
+				{
+				return vector().at(i);
+				}
+			
+			virtual const NodePtr at(size_type i) const
+				{
+				return vector().at(i);
+				}
+			
 			const std::vector<NodePtr>& vector() const
 				{
 				return children;
 				} 
 			virtual size_type size() const { return vector().size(); };
 			
+			virtual bool empty() const
+				{
+				return size()==0;
+				}
+				
 			virtual std::ostream& print(std::ostream& out) const
 				{
 				out << "[";
@@ -266,6 +323,24 @@ namespace json
 					}
 				return true;
 				}
+			virtual const Node* find(const char* path) const
+				{
+				char* p=(char*)path;
+				if(*p!='[') return NULL;
+				++p;
+				char* p2=p;
+				while(*p2!=']' && *p2!=0) ++p2;
+				if(*p2!=']') return NULL;
+				
+				std::string num(p,p2-p);
+				errno=0;
+				unsigned long int index=std::strtoul(num.c_str(),NULL,10);
+				
+				if(index>=size() || errno!=0) return NULL;
+				const NodePtr c=at(index);
+				if(*(p2+1)==0) return c; 
+				return c->find(p2+1);
+				}
 		}*ArrayNodePtr;
 	
 	typedef class ObjectNode:public Node
@@ -273,6 +348,8 @@ namespace json
 		private:
 			std::map<std::string,NodePtr> children;
 		public:
+			typedef std::map<std::string,NodePtr>::const_iterator const_iterator;
+			typedef std::map<std::string,NodePtr>::iterator iterator;
 			typedef std::map<std::string,NodePtr>::size_type size_type;
 			ObjectNode():Node() {}
 			virtual ~ObjectNode()
@@ -286,12 +363,28 @@ namespace json
 				children.clear();
 				}
 			
+			
+			
 			virtual node_type type() const { return object; };
 			
 			std::map<std::string,NodePtr>& map()
 				{
 				return children;
 				}
+			
+			
+			virtual bool containsKey(const char* s) const
+				{
+				return map().find(s)!=map().end();
+				}
+			
+			virtual const NodePtr get(const char* key) const
+				{
+				std::map<std::string,NodePtr>::const_iterator r=map().find(key);
+				if(r==map().end()) return NULL;
+				return r->second;
+				}
+			
 			
 			const std::map<std::string,NodePtr>& map() const
 				{
@@ -315,6 +408,25 @@ namespace json
 				out << "}";
 				return out;
 				}
+				
+			virtual iterator begin()
+				{
+				return map().begin();
+				}
+			virtual const_iterator begin() const
+				{
+				return map().begin();
+				}
+			
+			virtual iterator end()
+				{
+				return map().end();
+				}
+			
+			virtual const_iterator end() const
+				{
+				return map().end();
+				}	
 			
 			virtual Node* clone() const
 				{
@@ -344,6 +456,30 @@ namespace json
 					++r2;
 					}
 				return true;
+				}
+			virtual const Node* find(const char* path) const
+				{
+				char* p=(char*)path;
+				if(p==NULL) return NULL;
+				while(p[0]=='/') ++p;
+				char* p2=p;
+				while(*p2!=0 && *p2!='/' && *p2!='[')
+					{
+					++p2;
+					}
+				std::string key(p,p2-p);
+				NodePtr child=get(key.c_str());
+				if(child==NULL) return NULL;
+				if(*p2==0) return child;
+				else if(*p2=='/' && child->isObject())
+					{
+					return child->find(p2+1);
+					}
+				else if(*p2=='[' && child->isArray())
+					{
+					return child->find(p2);
+					}	
+				return NULL;
 				}
 		}*ObjectNodePtr;
 
@@ -693,7 +829,8 @@ class	Parser: public lindenb::io::Lexer
 
 /**
  *
- * JSONBinding
+ * JSONBinding 
+ * serialization of a JSON structure
  */
 class JSONBinding: public lindenb::io::TupleBinding<Node>
 	{
@@ -718,7 +855,13 @@ class JSONBinding: public lindenb::io::TupleBinding<Node>
 				case boolean: return std::auto_ptr<Node>(new BoolNode(readBool(in)));break;
 				case integer: return  std::auto_ptr<Node>(new IntegerNode(readLong(in)));break;
 				case floating: return std::auto_ptr<Node>(new DoubleNode(readDouble(in)));break;
-				case string: return std::auto_ptr<Node>(new StringNode(*readString(in))); break;	
+				case string:
+					{
+					std::auto_ptr<std::string> s=readString(in);
+					std::auto_ptr<Node> s2(new StringNode(*(s.get())));
+					return s2;
+					break;
+					}
 				case array:
 					{
 					ArrayNodePtr array=new ArrayNode();
@@ -739,10 +882,9 @@ class JSONBinding: public lindenb::io::TupleBinding<Node>
 					
 					for(std::map<std::string,NodePtr>::size_type i=0;i< n;++i)
 						{
-						std::string* key=readString(in);
+						std::auto_ptr<std::string> key=readString(in);
 						NodePtr value=readObject(in).release();
-						
-						map->map().insert(std::pair<std::string,NodePtr>(*key,value));
+						map->map().insert(std::pair<std::string,NodePtr>(*(key.get()),value));
 						}
 					return std::auto_ptr<Node>(map);
 					break;
@@ -779,10 +921,10 @@ class JSONBinding: public lindenb::io::TupleBinding<Node>
 				case object:
 					{
 					const ObjectNodePtr map=((const ObjectNodePtr)myobject);
-					std::map<std::string,NodePtr>::size_type n=map->map().size();
-					write(out,(const char*)&n,sizeof(std::map<std::string,NodePtr>::size_type));
-					for(std::map<std::string,NodePtr>::const_iterator r=map->map().begin();
-						r!=map->map().end();
+					ObjectNode::size_type n=map->map().size();
+					write(out,(const char*)&n,sizeof(ObjectNode::size_type));
+					for(ObjectNode::const_iterator r=map->begin();
+						r!=map->end();
 						++r)
 						{
 						writeString(out,&(r->first));

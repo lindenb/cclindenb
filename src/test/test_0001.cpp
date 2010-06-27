@@ -43,7 +43,7 @@ static void test0003()
 	std::cout << (*node) << std::endl;
 	lindenb::json::NodePtr node2=node->clone();
 	std::cout << (*node2) << std::endl;
-	
+	std::cout << *(node2->find("[5]/id2")) << std::endl;
 	assert(node->equals(node2));
 	
 	delete node2;

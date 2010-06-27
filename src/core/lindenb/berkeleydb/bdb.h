@@ -1,94 +1,13 @@
 #ifndef _LINDENB_BERKELEYDB_H
 #define _LINDENB_BERKELEYDB_H
 #include <db.h>
+#include "lindenb/io/binding.h"
 
 namespace lindenb
 {
 
 namespace bdb
 {
-
-/**
- * TupleBinding
- */
-template<typename T>
-class TupleBinding
-	{
-	public:
-		virtual void objectToEntry(const T& object,DBT* entry)=0;
-		virtual void free(DBT* entry)=0;
-		virtual std::auto_ptr<T> entryToObject(const DBT* entry)=0;
-	};
-
-/**
- * CopyBinding
- */
-template<typename T>
-class CopyBinding:public TupleBinding<T>
-	{
-	public:
-		virtual void objectToEntry(const T& object,DBT* entry)
-			{
-			std::memset((void*)entry,0,sizeof(DBT));
-			entry->data=(char*)&object;
-			entry->size=sizeof(T);
-			}
-		virtual void free(DBT* entry)
-			{
-
-			}
-		virtual std::auto_ptr<T> entryToObject(const DBT* entry)
-			{
-			T *ptr=new T;
-			std::memcpy(ptr,entry->data,sizeof(T));
-			std::free(entry->data);
-			return std::auto_ptr<T>(ptr);
-			}
-	};
-
-/**
- * StringBinding
- */
-class StringBinding:public TupleBinding<std::string>
-	{
-	public:
-		virtual void objectToEntry(const std::string& object,DBT* entry)
-			{
-			std::memset((void*)entry,0,sizeof(DBT));
-			std::string::size_type len=object.size();
-			entry->size=sizeof(std::string::size_type)+len;
-			char* ptr=new char[entry->size];
-			std::memcpy(&ptr[0],&len,sizeof(std::string::size_type));
-			object.copy(&ptr[sizeof(std::string::size_type)],len);
-			entry->data=ptr;
-			}
-		virtual void free(DBT* entry)
-			{
-			delete (char*)(entry->data);
-			}
-		virtual std::auto_ptr<std::string> entryToObject(const DBT* entry)
-			{
-			std::string::size_type len;
-			const char* ptr=(const char*)entry->data;
-			std::memcpy(&len,&ptr[0],sizeof(std::string::size_type));
-			std::string *s=new std::string(
-				&(ptr[sizeof(std::string::size_type)]),
-				len
-				);
-			return std::auto_ptr<std::string>(s);
-			}
-	};
-
-class IntBinding:public CopyBinding<int>
-	{
-	public:
-	};
-
-class RecnoBinding:public CopyBinding<db_recno_t>
-	{
-	public:
-	};
-
 
 template<typename K,typename V>
 class Database
@@ -135,7 +54,7 @@ class Database
 			{
 			if(ret==0) return;
 			std::ostringstream err;
-			err << "An error occurred: "
+			err << "A BerkekeyDB error occurred: "
 				<< ::db_strerror(ret)
 				;
 			throw std::runtime_error(err.str());
@@ -148,13 +67,13 @@ class Database
 			}
 
 		TupleBinding<K>* getKeyBinding()
-				{
-				return keyBinding;
-				}
+			{
+			return keyBinding;
+			}
 		TupleBinding<V>* getDataBinding()
-				{
-				return dataBinding;
-				}
+			{
+			return dataBinding;
+			}
 
 
 		std::auto_ptr<V> _get(DBT* key)
@@ -255,18 +174,7 @@ class Database
 			}
 	};
 
-/**
- * RecnoDatabase
- */
-template<typename V>
-class RecnoDatabase:public Database<db_recno_t,V>
-	{
-	public:
-		RecnoDatabase()
-			{
 
-			}
-	};
 }//bdb
 }//lindenb
 #endif
