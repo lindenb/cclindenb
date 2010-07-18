@@ -15,6 +15,7 @@
 #include <sstream>
 #include <vector>
 #include <gd.h>
+#include <iostream>
 namespace lindenb { namespace gd {
 
 class ImageFactory;
@@ -22,6 +23,11 @@ class Image;
 
 typedef int Color;
 
+std::ostream& operator<< (std::ostream& out,const gdPoint& o)
+	{
+	out << "{'x':" << o.x << ",'y':" << o.y << "}";
+	return out;
+	}
 
 class Image
 	{
@@ -104,7 +110,7 @@ class Image
 			
 		virtual void fillPolygon(std::vector<gdPoint>& points, Color color)
 			{
-			drawPolygon(&(*points.begin()), points.size(), color);
+			fillPolygon(&(*points.begin()), points.size(), color);
 			}
 			
 		virtual void fillPolygon( gdPoint* points,int nPoints, Color color)

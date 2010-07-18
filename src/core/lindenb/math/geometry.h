@@ -9,6 +9,7 @@
 #ifndef _LINDENB_GEOMETRY_H_
 #define _LINDENB_GEOMETRY_H_
 #include <iostream>
+#include <math.h>
 #include "lindenb/math/math.h"
 namespace lindenb { namespace math {  namespace geom {
 	
@@ -34,15 +35,27 @@ namespace lindenb { namespace math {  namespace geom {
 				return (*this);
 				}
 			
-			double distanceSq(Point& other) const
+			double distanceSq(double x1,double y1) const
 				{
-				return std::pow(x-other.x,2.0)+std::pow(y-other.y,2);
+				return (x-x1)*(x-x1)+(y-y1)*(y-y1);
+				}
+			
+			double distance(double x1,double y1) const
+				{
+				return hypot(x-x1,y-y1);
+				}
+			
+			double distanceSq(const Point& other) const
+				{
+				return (x-other.x)*(x-other.x)+(y-other.y)*(y-other.y);
 				}
 				
-			double distance(Point& other) const
+			double distance(const Point& other) const
 				{
 				return hypot(x-other.x,y-other.y);
 				}
+			
+			
 			
 			std::ostream& print(std::ostream &out) const
 				{
@@ -59,7 +72,7 @@ namespace lindenb { namespace math {  namespace geom {
 	class Line
 		{
 		public:
-			enum Intersection { PARALLEL, COINCIDENT, NO_INTERESECTION, INTERESECTION };
+			enum Intersection { NO_INTERESECTION=0, INTERESECTION=1, PARALLEL=2, COINCIDENT=3, };
 			
 			Point p1;
 			Point p2;
@@ -170,6 +183,11 @@ namespace lindenb { namespace math {  namespace geom {
 			Circle(double cx,double cy,double r):center(cx,cy),r(r)
 				{	
 				}
+			
+			Circle(const Point& c,double r):center(c),r(r)
+				{	
+				}
+				
 			Circle(const Circle& cp):center(cp.center),r(cp.r)
 				{
 				}
@@ -189,7 +207,7 @@ namespace lindenb { namespace math {  namespace geom {
 				double dy = other.center.y - center.y;
 				
 				/* Determine the straight-line distance between the centers. */
-				double d = hypot(dx,dy); 
+				double d = lindenb::math::hypoth(dx,dy); 
 				
 				/* Check for solvability. */
 				if (d > (r + other.r))
@@ -227,7 +245,7 @@ namespace lindenb { namespace math {  namespace geom {
 				/* Determine the distance from point 2 to either of the
 				* intersection points.
 				*/
-				double h = hypot(r,a);
+				double h = std::sqrt(r*r-a*a);
 				
 				/* Now determine the offsets of the intersection points from
 				* point 2.
