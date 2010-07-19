@@ -9,6 +9,7 @@
 #ifndef _LINDENB_GEOMETRY_H_
 #define _LINDENB_GEOMETRY_H_
 #include <iostream>
+#include <algorithm>
 #include <math.h>
 #include "lindenb/math/math.h"
 namespace lindenb { namespace math {  namespace geom {
@@ -67,7 +68,7 @@ namespace lindenb { namespace math {  namespace geom {
 		{
 		return p.print(out);
 		}
-
+	
 	
 	class Line
 		{
@@ -170,6 +171,50 @@ namespace lindenb { namespace math {  namespace geom {
 		{
 		return L.print(out);
 		}
+		
+	class Rectangle
+		{
+		public:
+			double x;
+			double y;
+			double width;
+			double height;
+			Rectangle():x(0),y(0),width(0),height(0)
+				{
+				}
+			Rectangle(const Rectangle& cp):x(cp.x),y(cp.y),width(cp.width),height(cp.height)
+				{
+				}
+			
+			Rectangle(double x, double y,double width, double height):x(x),y(y),width(width),height(height)
+				{
+				}
+			
+			Rectangle(const Point& p1,const Point& p2):
+						x(std::min(p1.x,p2.x)),
+						y(std::min(p1.y,p2.y)),
+						width(std::fabs(p1.x-p2.x)),
+						height(std::fabs(p1.y-p2.y)),
+				{
+				}
+			
+			~Rectangle()
+				{
+				}
+			
+			std::ostream& print(std::ostream &out) const
+				{
+				out << "{'x':" << x << ",'y':" << y<<
+					",'width':"<< width << ",'height':" << height <<"}";
+				return out;
+				}
+		};
+	
+	std::ostream& operator<<(std::ostream &out, const Rectangle& R)
+		{
+		return L.print(out);
+		}
+	
 	
 	class Circle
 		{
