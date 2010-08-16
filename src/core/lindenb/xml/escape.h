@@ -1,5 +1,6 @@
 #ifndef _LINDENB_XML_ESCAPE_H
 #define _LINDENB_XML_ESCAPE_H
+#include <cstring>
 #include <string>
 #include <iostream>
 namespace lindenb
@@ -17,15 +18,18 @@ namespace xml
 class escape
 	{
 	private:
-		const std::string& s;
+		const char* s;
+		std::string::size_type len;
 	public:
 		friend std::ostream& operator<< (std::ostream& o,escape  const& object);
-		escape(const std::string& s):s(s) {}
+		escape(const std::string& str):s(str.c_str()),len(str.size()) {}
+		escape(const char*str):s(str),len(str==NULL?0:std::strlen(str)) {}
+		escape(const char*str,std::size_t len):s(str),len(str==NULL?0:len) {}
 	};
 
-std::ostream& operator<< (std::ostream& out, escapeC const& object)
+std::ostream& operator<< (std::ostream& out, const escape& object)
 	{
-	for(std::string::size_type i=0;i< object.s.size();++i)
+	for(std::size_t i=0;i< object.len;++i)
 		{
 		switch(object.s[i])
 			{

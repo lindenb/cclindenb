@@ -19,13 +19,13 @@ namespace json
 	{	
 	enum node_type
 		{
-		nil=1,
-		boolean=2,
-		integer=3,
-		floating=4,
-		string=5,
-		array=6,
-		object=7
+		nil=258,//starting from 258 for lex/flex tool
+		boolean=259,
+		integer=260,
+		floating=261,
+		string=262,
+		array=263,
+		object=265
 		};
 	
 	//forward declaration
@@ -104,30 +104,29 @@ namespace json
 	 	return object.print(o);
 	 	}
 	
-	template<typename T>
-	class GenericNode:public Node
+	/**
+	 *
+	 *  LeafNode
+	 *
+	 */
+	class LeafNode:public Node
 		{
 		protected:
-			T _value;
+			LeafNode() {}
 		public:
-			
-	
-			GenericNode(const T& var):_value(var) {}
-			virtual ~GenericNode() {}
-			virtual T& value() { return _value;}
-			virtual const T& value() const { return _value;}
+			virtual ~LeafNode() {}
 			virtual node_type type() const=0;
-			virtual std::ostream& print(std::ostream& out) const
-				{
-				out << value();
-				return out;
-				}
+			virtual std::ostream& print(std::ostream& out) const=0;
 			virtual bool equals(const Node* object) const=0;
 			virtual Node* clone() const=0;
 		};
 	
-	
-	typedef class NilNode:public Node
+	/**
+	 *
+	 * NilNode
+	 *
+	 */
+	typedef class NilNode:public LeafNode
 		{
 		public:
 			NilNode() {}
@@ -150,12 +149,20 @@ namespace json
 				}
 		}*NilNodePtr;
 	
-	typedef class BoolNode:public GenericNode<bool>
+	/**
+	 *
+	 * BoolNode
+	 *
+	 */
+	typedef class BoolNode:public LeafNode
 		{
+		private:
+			bool _value;
 		public:
-			BoolNode(const bool& value):GenericNode<bool>(value) {}
+			BoolNode(bool value):LeafNode(value) {}
 			virtual ~BoolNode() {}
 			virtual node_type type() const { return boolean; };
+			virtual bool value() const { return _value;}
 			virtual std::ostream& print(std::ostream& out) const
 				{
 				out << (value()?"true":"false");
@@ -174,11 +181,19 @@ namespace json
 		}*BoolNodePtr;
 	
 	
-	
-	typedef class StringNode:public GenericNode<std::string>
+	/**
+	 *
+	 *  StringNode
+	 *
+	 */
+	typedef class StringNode:public LeafNode
 		{
+		private:
+			std::string _value;
 		public:
-			StringNode(const std::string& value):GenericNode<std::string>(value) {}
+			StringNode(const std::string& value):StringNode(value) {}
+			StringNode(const char* value):StringNode(value) {}
+			const std::string& value() const { return _value;}
 			virtual ~StringNode() {}
 			virtual node_type type() const { return string; };
 			virtual std::ostream& print(std::ostream& out) const
@@ -198,17 +213,36 @@ namespace json
 				if(object==NULL  || object->type()!=this->type()) return false;
 				return value().compare(((StringNode*)object)->value())==0;
 				}
+			char at(std::string::size_type i) const
+				{
+				return _value.at(i);
+				}
+			char operator[](std::string::size_type i) const
+				{
+				return at(i);
+				}
+			std::string::size_type size() const
+				{
+				return _value.size();
+				}
 		}*StringNodePtr;
 	
 	
 	
-	
-	typedef class IntegerNode:public GenericNode<Node::json_integer_type>
+	/**
+	 *
+	 * IntegerNode
+	 *
+	 */
+	typedef class IntegerNode:public LeafNode
 		{
+		private:
+			Node::json_integer_type _value;
 		public:
-			IntegerNode(Node::json_integer_type value):GenericNode<Node::json_integer_type>(value) {}
+			IntegerNode(Node::json_integer_type value):_value(value) {}
 			virtual ~IntegerNode() {}
 			virtual node_type type() const { return integer; };
+			Node::json_integer_type value() const { return _value;}
 			virtual Node* clone() const
 				{
 				return new IntegerNode(value());
@@ -221,12 +255,19 @@ namespace json
 				}
 		}*IntegerNodePtr;
 	
-	
-	typedef class DoubleNode:public GenericNode<Node::json_floating_type>
+	/**
+	 *
+	 * DoubleNode
+	 *
+	 */
+	typedef class DoubleNode:public LeafNode
 		{
+		private:
+			Node::json_floating_type _value;
 		public:
-			DoubleNode(Node::json_floating_type value):GenericNode<Node::json_floating_type>(value) {}
+			DoubleNode(Node::json_floating_type value):_value(value) {}
 			virtual ~DoubleNode() {}
+			Node::json_floating_type value() const { return _value;}
 			virtual node_type type() const { return floating; };
 			virtual Node* clone() const
 				{
@@ -240,13 +281,36 @@ namespace json
 				}
 		}*DoubleNodePtr;
 	
-	typedef class ArrayNode:public Node
+	
+	/**
+	 *
+	 *  ComplexNode
+	 *
+	 */
+	class ComplexNode:public Node
+		{
+		protected:
+			ComplexNode() {}
+		public:
+			virtual ~ComplexNode() {}
+			virtual node_type type() const=0;
+			virtual std::ostream& print(std::ostream& out) const=0;
+			virtual bool equals(const Node* object) const=0;
+			virtual Node* clone() const=0;
+		};	
+	
+	/**
+	 *
+	 * ArrayNode
+	 *
+	 */
+	typedef class ArrayNode:public ComplexNode
 		{
 		private:
 			std::vector<NodePtr> children;
 		public:
 			typedef std::vector<NodePtr>::size_type size_type;
-			ArrayNode():Node() {}
+			ArrayNode():ComplexNode() {}
 			virtual ~ArrayNode()
 				{
 				while(!children.empty())
@@ -259,30 +323,31 @@ namespace json
 			
 			virtual node_type type() const { return array; };
 			
-			std::vector<NodePtr>& vector()
-				{
-				return children;
-				}
 			
 			virtual NodePtr at(size_type i)
 				{
-				return vector().at(i);
+				return children.at(i);
+				}
+			virtual NodePtr operator[](size_type i)
+				{
+				return at(i);
 				}
 			
 			virtual const NodePtr at(size_type i) const
 				{
-				return vector().at(i);
+				return children.at(i);
 				}
 			
-			const std::vector<NodePtr>& vector() const
+			virtual const NodePtr operator[](size_type i) const
 				{
-				return children;
-				} 
+				return at(i);
+				}
+			
 			virtual size_type size() const { return vector().size(); };
 			
 			virtual bool empty() const
 				{
-				return size()==0;
+				return children.empty()==0;
 				}
 				
 			virtual std::ostream& print(std::ostream& out) const
@@ -291,7 +356,7 @@ namespace json
 				for(size_type i=0;i< size();++i)
 					{
 					if(i!=0) out << ",";
-					vector().at(i)->print(out);
+					at(i)->print(out);
 					}
 				out << "]";
 				return out;
@@ -300,6 +365,7 @@ namespace json
 			virtual Node* clone() const
 				{
 				ArrayNode* node= new ArrayNode();
+				node->children.reserve(size());
 				for(size_type i=0;i< size();++i)
 					{
 					node->children.push_back(
@@ -343,7 +409,12 @@ namespace json
 				}
 		}*ArrayNodePtr;
 	
-	typedef class ObjectNode:public Node
+	/**
+	 *
+	 * ObjectNode
+	 *
+	 */
+	typedef class ObjectNode:public ComplexNode
 		{
 		private:
 			std::map<std::string,NodePtr> children;
@@ -351,7 +422,7 @@ namespace json
 			typedef std::map<std::string,NodePtr>::const_iterator const_iterator;
 			typedef std::map<std::string,NodePtr>::iterator iterator;
 			typedef std::map<std::string,NodePtr>::size_type size_type;
-			ObjectNode():Node() {}
+			ObjectNode():ComplexNode() {}
 			virtual ~ObjectNode()
 				{
 				for(std::map<std::string,NodePtr>::iterator r=children.begin();
@@ -362,7 +433,17 @@ namespace json
 					}
 				children.clear();
 				}
-			
+			std::set<std::string> keys() const
+				{
+				std::set<std::string> _set;
+				for(std::map<std::string,NodePtr>::const_iterator r=children.begin();
+					r!=children.end();
+					++r)
+					{
+					_set.insert(r->first);
+					}
+				return _set;
+				}
 			
 			
 			virtual node_type type() const { return object; };
@@ -456,30 +537,6 @@ namespace json
 					++r2;
 					}
 				return true;
-				}
-			virtual const Node* find(const char* path) const
-				{
-				char* p=(char*)path;
-				if(p==NULL) return NULL;
-				while(p[0]=='/') ++p;
-				char* p2=p;
-				while(*p2!=0 && *p2!='/' && *p2!='[')
-					{
-					++p2;
-					}
-				std::string key(p,p2-p);
-				NodePtr child=get(key.c_str());
-				if(child==NULL) return NULL;
-				if(*p2==0) return child;
-				else if(*p2=='/' && child->isObject())
-					{
-					return child->find(p2+1);
-					}
-				else if(*p2=='[' && child->isArray())
-					{
-					return child->find(p2);
-					}	
-				return NULL;
 				}
 		}*ObjectNodePtr;
 
@@ -935,7 +992,155 @@ class JSONBinding: public lindenb::io::TupleBinding<Node>
 				default:throw std::runtime_error("bad type");
 				}
 			}
+		};
+
+/**
+ *
+ * NodeComparator
+ *
+ */
+class NodeComparator
+	{
+	public:
+		NodeComparator()
+			{
+			}
+		virtual ~NodeComparator()
+			{
+			}
+		
+		virtual int compare(const NodePtr a,const NodePtr b)
+			{
+			if(a==b) return true;
+			switch(a->type())
+				{
+				case nil:
+					{
+					if(b->type()==nil) return 0;
+					return a->type()-b->type();
+					break;
+					}
+				case boolean:
+					{
+					const NilNode* ptrA = a->asNil();
+					if(b->type()==boolean)
+						{
+						const NilNode* ptrB = b->asNil();
+						return ((int)(ptrA->value()))-((int)(ptrB->value()));
+						}
+					return a->type()-b->type();
+					break;
+					}
+				case integer:
+					{
+					const IntegerNode* ptrA = a->asInteger();
+					switch(b->type())
+						{
+						case integer:
+							{
+							const IntegerNode* ptrB = b->asInteger();
+							return (int)(ptrA->value()- ptrB->value());
+							break;
+							}
+						case floating:
+							{
+							const DoubleNode* ptrB = b->asDouble();
+							return (int)((double)(ptrA->value())- ptrB->value());
+							break;
+							}
+						default:break;
+						}
+					return a->type()-b->type();
+					break;
+					}
+				case floating:
+					{
+					const DoubleNode* ptrA = a->asDouble();
+					switch(b->type())
+						{
+						case integer:
+							{
+							const IntegerNode* ptrB = b->asInteger();
+							return (int)(ptrA->value()- (double)ptrB->value());
+							break;
+							}
+						case floating:
+							{
+							const DoubleNode* ptrB = b->asDouble();
+							return (int)(ptrA->value()- ptrB->value());
+							break;
+							}
+						default:break;
+						}
+					return a->type()-b->type();
+					break;
+					}
+				case string:
+					{
+					const StringNode* ptrA = a->asString();
+					if(b->type()==string)
+						{
+						const StringNode* ptrB = b->asString();
+						return ptrA->compare(ptrB);
+						}
+					return a->type()-b->type();
+					break;
+					}
+				case array:
+					{
+					const ArrayNode* ptrA = a->asArray();
+					if(b->type()==array)
+						{
+						const ArrayNode* ptrB = b->asArray();
+						if(ptrA->size() != ptrB->size())
+							{
+							return ((long)ptrA->size()) - ((long)ptrB->size());
+							}
+						for(ArrayNode::size_type i=0;
+							i < ptrA->size();
+							++i)
+							{
+							int n= compare(ptrA->at(i),ptrB->at(i));
+							if(n!=0) return n;
+							}
+						return 0;
+						}
+					return a->type()-b->type();
+					break;
+					}
+				case object:
+					{
+					const ObjectNode* ptrA = a->asObject();
+					
+					if(b->type()==object)
+						{
+						const ObjectNode* ptrB = b->asObject();
+						if(ptrA->size() != ptrB->size())
+							{
+							return ((long)ptrA->size()) - ((long)ptrB->size());
+							}
+						ObjectNode::const_iterator rA=ptrA->begin();
+						ObjectNode::const_iterator rB=ptrB->begin();
+						while(rA!=ptrA->end())
+							{
+							
+							++rB;
+							++rA;
+							}
+						}
+					return a->type()-b->type();
+					break;
+					}
+				}
+			}
+		
+		bool operator()(const NodePtr a,const NodePtr b)
+			{
+			return lt(a,b);
+			}
+			
 	};
 
-	}}//namespaces	
+
+}}//namespaces	
 #endif
