@@ -9,6 +9,8 @@
 #include <cstring>
 #include <cassert>
 #include <zlib.h>
+#include "lindenb/lang/throw.h"
+
 namespace lindenb { namespace io {
 
 /**
@@ -37,10 +39,8 @@ class gzinbuf : public public lindenb::io::istreambuf
 			source=::gzopen(path,"rb");
 			if(source==NULL)
 				{
-				std::ostringstream os;
-                                os << "failed to open \"" << path<< "\" ("
-                                        << std::strerror(errno) << ").";
-                                throw std::runtime_error(os.str());
+				THROW("failed to open \"" << path<< "\" ("
+                                        << std::strerror(errno) << ").");
 				}
 			}
 			
