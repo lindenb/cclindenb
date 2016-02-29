@@ -43,7 +43,8 @@ struct PosixTarHeader
 LOCALNS::Tar::_init(void* header)
     {
     std::memset(header,0,sizeof(PosixTarHeader));
-    std::sprintf(TARHEADER->magic,"ustar  ");
+    std::strcpy(TARHEADER->magic,"ustar");
+    std::strcpy(TARHEADER->version, " ");
     std::sprintf(TARHEADER->mtime,"%011lo",time(NULL));
     std::sprintf(TARHEADER->mode,"%07o",0644);
     char * s = ::getlogin();
