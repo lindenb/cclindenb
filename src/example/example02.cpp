@@ -7,6 +7,11 @@
 #include <sstream>
 #include <thread>
 
+// Write an archive with multiple entries of the same file to stdout
+// unpack the archive by piping it to unix command tar
+// ./example02 | tar xv --record-size=512
+//
+
 int main(int argc, char **argv) {
   (void)argc;
   (void)argv;

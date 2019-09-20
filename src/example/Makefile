@@ -6,7 +6,6 @@ LD := clang
 BUILD    := ./build
 OBJ_DIR  := $(BUILD)/objects
 APP_DIR  := $(BUILD)
-TARGET   := hack01
 INCLUDE  := -I./ -I../tarlib/
 EXTSRC      := $(wildcard ../tarlib/*.cpp)
 SRC      := $(wildcard *.cpp)
@@ -14,7 +13,7 @@ SRC      := $(wildcard *.cpp)
 OBJECTS := $(EXTSRC:%.cpp=$(OBJ_DIR)/%.o)
 PROGRAMS := $(SRC:%.cpp=%)
 
-all: build $(APP_DIR)/$(TARGET)
+all: $(PROGRAMS)
 
 $(OBJ_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
@@ -23,10 +22,6 @@ $(OBJ_DIR)/%.o: %.cpp
 %: %.cpp $(OBJECTS)
 	@mkdir -p $(@D)
 	$(CXX) $(INCLUDE) $(LDFLAGS) $< $(OBJECTS)  -o $@
-
-$(APP_DIR)/$(TARGET): $(OBJECTS)
-	@mkdir -p $(@D)
-	$(LD) $(LDFLAGS) -o $(APP_DIR)/$(TARGET) $(OBJECTS)
 
 .PHONY: all build clean debug release
 
@@ -42,4 +37,4 @@ release: all
 
 clean:
 	-@rm -rvf $(OBJ_DIR)/*
-	-@rm -rvf $(APP_DIR)/$(TARGET)
+	-@rm -rvf $(PROGRAMS)
