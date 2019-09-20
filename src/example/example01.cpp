@@ -18,13 +18,10 @@ int main(int argc, char **argv) {
   tarball.put("myfiles/item1.txt", "Hello World 1\n");
   /* add item 2 */
   tarball.put("myfiles/item2.txt", "Hello World 2\n");
-  try{
   /* add a file */
-     tarball.putFile("tarfile.cpp", "myfiles/code.cpp");
-   } 
-   catch(std::runtime_error e) {
-      std::cerr<< "Trying to add file failed\nError code from library::"<< e.what()<< std::endl;
-   }
+  if (!tarball.putFile("tarfile.cpp", "myfiles/code.cpp")) {
+    std::cerr << "Trying to add file failed\n" << std::endl;
+  }
 
   /* finalize the tar file */
   tarball.finish();

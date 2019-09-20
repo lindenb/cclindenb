@@ -6,9 +6,9 @@
  *              plindenbaum@yahoo.fr
  *              http://plindenbaum.blogspot.com
  *
+ *  Major rescrutcutring Fredrik SIMONSSON 2019
  */
 #include "tarball.h"
-#include "throw.h"
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -66,11 +66,13 @@ void LOCALNS::Tar::_size(void *header, unsigned long fileSize) {
   std::sprintf(TARHEADER->size, "%011llo", (long long unsigned int)fileSize);
 }
 
-void LOCALNS::Tar::_filename(void *header, const char *filename) {
+bool LOCALNS::Tar::_filename(void *header, const char *filename) {
   if (filename == NULL || filename[0] == 0 || std::strlen(filename) >= 100) {
-    THROW("invalid archive name \"" << filename << "\"");
+    // THROW("invalid archive name \"" << filename << "\"");
+    return false;
   }
   std::snprintf(TARHEADER->name, 100, "%s", filename);
+  return true;
 }
 
 void LOCALNS::Tar::_endRecord(std::size_t len) {
@@ -82,9 +84,10 @@ void LOCALNS::Tar::_endRecord(std::size_t len) {
 }
 
 LOCALNS::Tar::Tar(std::ostream &out) : _finished(false), out(out) {
-  if (sizeof(PosixTarHeader) != 512) {
-    THROW(sizeof(PosixTarHeader));
-  }
+  // TODO if (sizeof(PosixTarHeader) != 512) {
+  // TODO how to handle this sanity check ...
+  // TODO THROW(sizeof(PosixTarHeader));
+  // TODO }
 }
 
 LOCALNS::Tar::~Tar() {
@@ -105,31 +108,35 @@ void LOCALNS::Tar::finish() {
   out.flush();
 }
 
-void LOCALNS::Tar::put(const char *filename, const std::string &s) {
-  put(filename, s.c_str(), s.size());
+bool LOCALNS::Tar::put(const char *filename, const std::string &s) {
+  return put(filename, s.c_str(), s.size());
 }
-void LOCALNS::Tar::put(const char *filename, const char *content) {
-  put(filename, content, std::strlen(content));
+bool LOCALNS::Tar::put(const char *filename, const char *content) {
+  return put(filename, content, std::strlen(content));
 }
 
-void LOCALNS::Tar::put(const char *filename, const char *content,
+bool LOCALNS::Tar::put(const char *filename, const char *content,
                        std::size_t len) {
   PosixTarHeader header;
   _init((void *)&header);
-  _filename((void *)&header, filename);
+  if (!_filename((void *)&header, filename))
+    return false;
   header.typeflag[0] = 0;
   _size((void *)&header, len);
   _checksum((void *)&header);
   out.write((const char *)&header, sizeof(PosixTarHeader));
   out.write(content, len);
   _endRecord(len);
+  return true;
 }
 
-void LOCALNS::Tar::putFile(const char *filename, const char *nameInArchive) {
+bool LOCALNS::Tar::putFile(const char *filename, const char *nameInArchive) {
+  bool sucess = true;
   char buff[BUFSIZ];
   std::FILE *in = std::fopen(filename, "rb");
   if (in == NULL) {
-    THROW("Cannot open " << filename << " " << std::strerror(errno));
+    // THROW("Cannot open " << filename << " " << std::strerror(errno));
+    return false;
   }
   std::fseek(in, 0L, SEEK_END);
   long int len = std::ftell(in);
@@ -137,7 +144,8 @@ void LOCALNS::Tar::putFile(const char *filename, const char *nameInArchive) {
 
   PosixTarHeader header;
   _init((void *)&header);
-  _filename((void *)&header, nameInArchive);
+  if (!_filename((void *)&header, nameInArchive))
+    return false;
   header.typeflag[0] = 0;
   _size((void *)&header, len);
   _checksum((void *)&header);
@@ -150,4 +158,5 @@ void LOCALNS::Tar::putFile(const char *filename, const char *nameInArchive) {
   std::fclose(in);
 
   _endRecord(len);
+  return true;
 }
