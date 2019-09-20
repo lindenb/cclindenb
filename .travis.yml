@@ -1,0 +1,15 @@
+os: linux
+language: cpp
+compiler: clang
+addons:
+  apt:
+      sources:
+      - ubuntu-toolchain-r-test
+      - llvm-toolchain-trusty-6.0
+      packages:
+        - clang
+        - libstdc++-7-dev
+  env:
+  - MATRIX_EVAL="CC=clang && CXX=clang++"
+script:
+  - (cd src/example; make)
