@@ -8,6 +8,7 @@
  *
  */
 #include "tarball.h"
+#include "throw.h"
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -36,15 +37,12 @@ struct PosixTarHeader {
   char pad[12];
 };
 
-LOCALNS::Tar::_init(void *header) {
+void LOCALNS::Tar::_init(void *header) {
   std::memset(header, 0, sizeof(PosixTarHeader));
   std::strcpy(TARHEADER->magic, "ustar");
   std::strcpy(TARHEADER->version, " ");
   std::sprintf(TARHEADER->mtime, "%011lo", time(NULL));
   std::sprintf(TARHEADER->mode, "%07o", 0644);
-  char *s = ::getlogin();
-  if (s != NULL)
-    std::snprintf(TARHEADER, 32, "%s", s);
   std::sprintf(TARHEADER->gname, "%s", "users");
 }
 
@@ -91,7 +89,7 @@ LOCALNS::Tar::Tar(std::ostream &out) : _finished(false), out(out) {
 
 LOCALNS::Tar::~Tar() {
   if (!_finished) {
-    cerr << "[warning]tar file was not finished." << endl;
+    std::cerr << "[warning]tar file was not finished." << std::endl;
   }
 }
 
