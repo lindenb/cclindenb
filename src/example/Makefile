@@ -8,17 +8,21 @@ OBJ_DIR  := $(BUILD)/objects
 APP_DIR  := $(BUILD)
 TARGET   := hack01
 INCLUDE  := -I./ -I../tarlib/
-SRC      :=                      \
-   $(wildcard ../tarlib/*.cpp) \
-   $(wildcard *.cpp)
+EXTSRC      := $(wildcard ../tarlib/*.cpp)
+SRC      := $(wildcard *.cpp)
 
-OBJECTS := $(SRC:%.cpp=$(OBJ_DIR)/%.o)
+OBJECTS := $(EXTSRC:%.cpp=$(OBJ_DIR)/%.o)
+PROGRAMS := $(SRC:%.cpp=%)
 
 all: build $(APP_DIR)/$(TARGET)
 
 $(OBJ_DIR)/%.o: %.cpp
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) $(INCLUDE) -o $@ -c $<
+
+%: %.cpp $(OBJECTS)
+	@mkdir -p $(@D)
+	$(CXX) $(INCLUDE) $(LDFLAGS) $< $(OBJECTS)  -o $@
 
 $(APP_DIR)/$(TARGET): $(OBJECTS)
 	@mkdir -p $(@D)
