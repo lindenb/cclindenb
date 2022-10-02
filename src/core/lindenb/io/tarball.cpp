@@ -16,7 +16,6 @@
 #include "lindenb/lang/throw.h"
 #define LOCALNS lindenb::io
 #define TARHEADER static_cast<PosixTarHeader*>(header)
-#define CHARHEADER static_cast<char*>(header)
 
 struct PosixTarHeader
 	{
@@ -49,7 +48,7 @@ void LOCALNS::Tar::_init(void* header)
     std::sprintf(TARHEADER->mtime,"%011lo",time(NULL));
     std::sprintf(TARHEADER->mode,"%07o",0644);
     char * s = ::getlogin();
-    if(s!=NULL)  std::snprintf(CHARHEADER,32,"%s",s);
+    if(s!=NULL)  std::snprintf(TARHEADER->uname,32,"%s",s);
     std::sprintf(TARHEADER->gname,"%s","users");
     }
 
